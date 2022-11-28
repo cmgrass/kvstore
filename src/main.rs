@@ -22,9 +22,9 @@ fn main() {
 
     // ----- Create a file to store our key/value -----
     let contents = format!("{}\t{}\n", key, value);
-//    std::fs::write("kv.db", contents).unwrap();
+    std::fs::write("kv.db", contents).unwrap();
 
-    let database = Database::new().expect("Database::new() crashed");
+    let database = Database::new().expect("Failed to create db");
 }
 
 struct Database {
@@ -34,7 +34,7 @@ struct Database {
 impl Database { // "impl" is a way to add functionality to a type
     fn new() -> Result<Database, std::io::Error> {
         // read the kv.db file
-//        let contents = match std::fs::read_to_string("kv.db") {
+//        let contents: String = match std::fs::read_to_string("kv.db") {
 //            Ok(c) => c,
 //            Err(error) => {
 //                return Err(error);
@@ -43,10 +43,17 @@ impl Database { // "impl" is a way to add functionality to a type
         let contents = std::fs::read_to_string("kv.db")?; // <- Equivalent to commented out block
 
         // parse the string
+        let mut map = HashMap::new();
+
+        for line in contents.lines() { // `lines` returns an iterator
+            let mut chunks = line.splitn(2, '\t');
+            let key = chunks.next().expect("No key!");
+            let value = chunks.next().expect("No value!");
+            map.insert(key.to_owned(), value.to_owned()); // Since key/value are pointers to String owned by `contents`, we used `to_owned()` method to make a copy of the memory and bind it to this map insert.
+        }
+
         // populate the map
-        Ok(Database {
-            map: HashMap::new()
-        })
+        Ok(Database { map: map })
     }
 }
 
