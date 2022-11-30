@@ -24,10 +24,12 @@ fn main() {
     database.insert(&key, &value);
     database.insert(&key.to_uppercase(), &value);
     // Database::insert(database, key value); // Equivalent to previous line see notes about methods below.
+    database.flush().unwrap();
 }
 
 struct Database {
     map: HashMap<String, String>,
+    flush: bool,
 }
 
 impl Database { // "impl" is a way to add functionality to a type
@@ -35,13 +37,14 @@ impl Database { // "impl" is a way to add functionality to a type
     // `new()` is an associated function.
     fn new() -> Result<Database, std::io::Error> {
         // read the kv.db file
-//        let contents: String = match std::fs::read_to_string("kv.db") {
-//            Ok(c) => c,
-//            Err(error) => {
-//                return Err(error);
-//            }
-//        };
-        let contents = std::fs::read_to_string("kv.db")?; // <- Equivalent to commented out block
+        let contents: String = match std::fs::read_to_string("kv.db") {
+            Ok(c) => c,
+            Err(error) => {
+                println!("kv.db error: {}", error);
+                return Err(error);
+            }
+        };
+//        let contents = std::fs::read_to_string("kv.db")?; // <- Equivalent to commented out block above
 
         // parse the string
         let mut map = HashMap::new();
@@ -54,7 +57,8 @@ impl Database { // "impl" is a way to add functionality to a type
         }
 
         // populate the map
-        Ok(Database { map: map })
+        //Ok(Database { map: map, flush: false})
+        Ok(Database { map, flush: false}) // Because field is same name as variable, we only have to write it once. It's a cool shorthand equivalent to above.
     }
 
     // `insert()` is an associated function, but a special kind called a `method`.
@@ -64,12 +68,35 @@ impl Database { // "impl" is a way to add functionality to a type
         self.map.insert(key.to_owned(), value.to_owned());
     }
 
-    fn flush(self) -> std::io::Result<()> { // Returns `Unit` (== `()`) if success (like void in other languages)
-        let contents = String::new();
-        for pairs in self.map {
-            let kvpair = format!("{}\t{}\n", pairs.0, pairs.1);
-            contents.push_str(kvpair); <-- Pick up here
+    fn flush(mut self) -> std::io::Result<()> { // Returns `Unit` (== `()`) if success (like void in other languages)
+        self.flush = true;
+        do_flush(&self)
+    }
+}
+
+// Drop trait: By implementing this trait, you can adding extra functionality when an owned binding "drops" out of scope. For example - in this case - wouldn't it be cool to not need to call our `flush()` method? It just drops and flushes automatically!?
+// (A "trait" is a way to specify functionality for multiple types, like an "interface" in other languages)
+impl Drop for Database {
+    fn drop(&mut self) { // Mandatory to define the `drop()` method when implementing the `Drop` trait.
+        if !self.flush {
+            let _ = do_flush(self); // The `_` says to compiler: put the Result in a variable, I don't care about it.
         }
     }
+}
+
+fn do_flush(database: &Database) -> std::io::Result<()> {
+
+    println!("do_flush called");
+
+    let mut contents = String::new();
+    for (key, value) in &database.map {
+            //let kvpair = format!("{}\t{}\n", key, value); // More optimal to do below, no allocating String at each iteration.
+            contents.push_str(&key);
+            contents.push('\t');
+            contents.push_str(&value);
+            contents.push('\n');
+
+    }
+    std::fs::write("kv.db", contents)
 }
 
